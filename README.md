@@ -288,3 +288,44 @@ Agregamos la dependencia al pom.xml
 >     <artifactId>spring-boot-starter-actuator</artifactId>
 > </dependency>
 
+Utilizamos la url en nuestro navegador y con el comando curl 
+
+HEALTH
+Navegador : http://localhost:8080/actuator/health
+
+![img.png](img.png)
+
+CMD : curl http://localhost:8080/actuator/health
+
+![img_1.png](img_1.png)
+
+El endpoint /actuator/health indica si la aplicación y sus componentes 
+críticos están funcionando correctamente, mostrando un estado general
+(UP o DOWN) junto con el detalle de cada componente verificado 
+automáticamente, como la conexión a PostgreSQL (db), el espacio 
+disponible en disco (diskSpace) y una verificación básica de que la
+app responde (ping); esto permite detectar fácilmente, por ejemplo, 
+si la base de datos se desconecta.
+
+METRICS
+
+Navegador : http://localhost:8080/actuator/metrics
+![img_2.png](img_2.png)
+![img_4.png](img_4.png)
+
+CMD : curl http://localhost:8080/actuator/metrics
+
+![img_3.png](img_3.png)
+
+El endpoint /actuator/metrics, por su parte, no muestra valores
+directamente sino un catálogo con los nombres de todas las métricas 
+disponibles que la aplicación está midiendo internamente, como el 
+uso de memoria de la JVM, el uso de CPU, las estadísticas de 
+peticiones HTTP recibidas, o el número de conexiones activas e 
+inactivas hacia la base de datos a través del pool de Hikari. 
+Finalmente, al consultar una métrica específica 
+con /actuator/metrics/{nombre} (por ejemplo jvm.memory.used), 
+Spring devuelve el valor actual de esa métrica junto con su 
+descripción, unidad de medida y posibles filtros adicionales,
+permitiendo así monitorear en tiempo real el comportamiento y 
+la salud de la aplicación sin necesidad de implementar ese seguimiento manualmente.
