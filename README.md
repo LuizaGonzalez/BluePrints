@@ -105,3 +105,101 @@ para traducir entre las clases del modelo de dominio y las entidades JPA.
 7) Corremos la aplicación:
 
 > mvn spring-boot:run
+
+### 3. Buenas prácticas de API REST
+
+- Usa códigos HTTP correctos
+
+Estos fueron os cambios realizados:
+
+1) getAll(), byAuthor(), byAuthorAndName() y addPoint(): no se tocaron ya usaban 200 para éxito y 404 para "no encontrado", que es justo lo que pedía el checklist. No había nada que corregir.
+2) add(): Se realizo el cambio de 403 a 409, debido a que, 403 es un error de que no tengo permisos, y el 409 coincide con que el error sea que el recurso ya existe.
+3) El error 400: no esta explicito, se genera con la notacion @valid que tenmos en el metodo NewBlueprintRequest.
+
+## Códigos de respuesta HTTP
+
+| Código | Nombre | Caso de uso | Endpoint(s) | Implementación en Java |
+|--------|--------|--------------|-------------|--------------------------|
+| `200`  | OK | Consulta exitosa | `GET /api/v1/blueprints`, `GET /api/v1/blueprints/{author}`, `GET /api/v1/blueprints/{author}/{bpname}` | `ResponseEntity.ok(...)` |
+| `201`  | Created | Blueprint creado exitosamente | `POST /api/v1/blueprints` | `ResponseEntity.status(HttpStatus.CREATED).build()` |
+| `202`  | Accepted | Punto agregado exitosamente | `PUT /api/v1/blueprints/{author}/{bpname}/points` | `ResponseEntity.status(HttpStatus.ACCEPTED).build()` |
+| `400`  | Bad Request | Datos inválidos (`author` o `name` vacíos) | `POST /api/v1/blueprints` | Automático vía `@Valid` en `NewBlueprintRequest` |
+| `404`  | Not Found | El blueprint solicitado no existe | `GET /api/v1/blueprints/{author}`, `GET /api/v1/blueprints/{author}/{bpname}`, `PUT /api/v1/blueprints/{author}/{bpname}/points` | `ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()))` |
+| `409`  | Conflict | Ya existe un blueprint con el mismo `author` y `name` | `POST /api/v1/blueprints` | `ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", e.getMessage()))` |
+
+- Implementa una clase genérica de respuesta uniforme
+
+ApiResponse<T> existe para que todos los endpoints de tu API respondan con la misma estructura 
+(code, message, data), en lugar de que cada uno devuelva un formato distinto como pasaba antes 
+(a veces un Blueprint directo, a veces un Map con "error", a veces nada)
+
+4) OpenAPI / Swagger
+
+> http://localhost:8080/swagger-ui.html
+
+![img.png](Imagenes/img.png)
+
+![img.png](Imagenes/imgSwagger.png)
+
+![img.png](Imagenes/imgSwaggerR.png)
+
+
+### **Anota endpoints con @Operation y @ApiResponse.**
+
+### Documentación con OpenAPI/Swagger
+
+Cada endpoint del controlador está anotado con **@Operation** y **@ApiResponses** / **@ApiResponse** (springdoc-openapi), 
+lo que permite documentar de forma explícita qué hace cada endpoint y 
+qué códigos de respuesta puede devolver (200, 201, 202, 400, 404, 409),
+junto con una descripción de cada caso. Esta documentación se genera 
+automáticamente en una interfaz interactiva disponible 
+en **/swagger-ui.html**, donde es posible explorar y probar todos los
+endpoints sin necesidad de herramientas externas como Postman.
+
+![img.png](Imagenes/imgSwaggerAnotaciones.png)
+
+![img_1.png](Imagenes/img_1.png)
+
+### **5. Filtros de Blueprints**
+
+Implementa filtros:
+* RedundancyFilter: elimina puntos duplicados consecutivos.
+* UndersamplingFilter: conserva 1 de cada 2 puntos.
+
+**Redundancy**
+
+cuando se inicia el spring boot vemos en la terminal que se activo el perfil redundancy
+
+![img.png](img.png)
+
+**Pruebas**
+
+![img_1.png](img_1.png)
+Aqui agregamos dos puntos (0,0) y en la consulta de este plano solo me aparece uno, lo cual podemos concluir que esta funcionando correctamente.
+
+**Datos de prueba Redundancy**
+
+> curl -X POST http://localhost:8080/api/v1/blueprints -H "Content-Type: application/json" -d "{\"author\":\"Juliana\",\"name\":\"animacion\",\"points\":[{\"x\":1,\"y\":1},{\"x\":1,\"y\":1},{\"x\":5,\"y\":5}]}"
+> curl http://localhost:8080/api/v1/blueprints/Juliana/animacion
+
+**Undersampling**
+
+![img_2.png](img_2.png)
+cuando se inicia el spring boot vemos en la terminal que se activo el perfil undersampling
+
+**Pruebas**
+![img_3.png](img_3.png)
+Aqui agregue puntos consecutivos que en si no aportan nada a lo que se quiera dibujar, cuando se consulta solo se evidencian los que permiten observar la figura.
+
+**Datos de prueba undersampling**
+
+> curl -X POST http://localhost:8080/api/v1/blueprints -H "Content-Type: application/json" -d "{\"author\":\"Alex\",\"name\":\"linea\",\"points\":[{\"x\":10,\"y\":10},{\"x\":11,\"y\":11},{\"x\":12,\"y\":12},{\"x\":13,\"y\":13},{\"x\":14,\"y\":14}]}"
+> curl http://localhost:8080/api/v1/blueprints/Alex/linea
+
+
+Los filtros RedundancyFilter y UndersamplingFilter existen para reducir la cantidad de puntos de un blueprint antes de devolverlo, 
+cada uno con un propósito distinto: RedundancyFilter elimina puntos duplicados que aparecen de forma consecutiva 
+(por ejemplo, errores de captura donde el mismo punto se registra varias veces seguidas), mientras que UndersamplingFilter reduce
+la densidad general del trazo conservando solo uno de cada dos puntos, sin importar si son repetidos o no. Ambos se activan mediante
+perfiles de Spring (redundancy y undersampling) y son mutuamente excluyentes, ya que el sistema solo permite tener un filtro
+activo a la vez; cuando ninguno de los dos está activo, se usa IdentityFilter como comportamiento por defecto, que devuelve el blueprint sin ninguna transformación.
