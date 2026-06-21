@@ -170,11 +170,11 @@ Implementa filtros:
 
 cuando se inicia el spring boot vemos en la terminal que se activo el perfil redundancy
 
-![img.png](img.png)
+![img.png](Imagenes/img5.png)
 
 **Pruebas**
 
-![img_1.png](img_1.png)
+![img_1.png](Imagenes/img_6.png)
 Aqui agregamos dos puntos (0,0) y en la consulta de este plano solo me aparece uno, lo cual podemos concluir que esta funcionando correctamente.
 
 **Datos de prueba Redundancy**
@@ -184,11 +184,11 @@ Aqui agregamos dos puntos (0,0) y en la consulta de este plano solo me aparece u
 
 **Undersampling**
 
-![img_2.png](img_2.png)
+![img_2.png](Imagenes/img_2.png)
 cuando se inicia el spring boot vemos en la terminal que se activo el perfil undersampling
 
 **Pruebas**
-![img_3.png](img_3.png)
+![img_3.png](Imagenes/img_3.png)
 Aqui agregue puntos consecutivos que en si no aportan nada a lo que se quiera dibujar, cuando se consulta solo se evidencian los que permiten observar la figura.
 
 **Datos de prueba undersampling**
@@ -203,3 +203,88 @@ cada uno con un propósito distinto: RedundancyFilter elimina puntos duplicados 
 la densidad general del trazo conservando solo uno de cada dos puntos, sin importar si son repetidos o no. Ambos se activan mediante
 perfiles de Spring (redundancy y undersampling) y son mutuamente excluyentes, ya que el sistema solo permite tener un filtro
 activo a la vez; cuando ninguno de los dos está activo, se usa IdentityFilter como comportamiento por defecto, que devuelve el blueprint sin ninguna transformación.
+
+
+**Evidencia de consultas en Swagger UI y evidencia de mensajes en la base de datos.**
+
+1) Verificamos que el contenedor este corriendo.
+2) Entrar al cliente de PostgreSQL dentro del contenedor.
+ >docker exec -it blueprints-postgres psql -U blueprints_user -d blueprints_db
+3) Listamos las tablas.
+ > \dt
+![EvidenciaBD.png](Imagenes/EvidenciaBD.png)
+ > SELECT * FROM points;
+ 
+ ![PointsTabla.png](Imagenes/PointsTabla.png)
+ > SELECT * FROM blueprints;
+ 
+ ![blueprintsTabla.png](Imagenes/blueprintsTabla.png)
+
+ > SELECT b.author, b.name, p.x, p.y
+ FROM blueprints b
+ JOIN points p ON p.blueprint_id = b.id
+ ORDER BY b.author, b.name, p.id;
+ 
+ ![joinTablas.png](Imagenes/joinTablas.png)
+
+## Buenas prácticas aplicadas
+
+- **Separación por capas (Controller → Service → Persistence)**: cada capa tiene una responsabilidad única. El controlador maneja HTTP, 
+    el servicio orquesta la lógica de negocio (incluyendo el filtrado), y la persistencia se encarga exclusivamente del acceso a datos.
+
+- **Uso de interfaces**: **BlueprintPersistence** y **BlueprintsFilter** son interfaces, el resto de la aplicación depende de 
+    ellas y no de sus implementaciones concretas. Esto permitió migrar de almacenamiento en memoria a PostgreSQL, y alternar entre filtros,
+    sin modificar el controlador ni el servicio.
+
+- **Perfiles de Spring (@Profile)** para seleccionar implementaciones en tiempo de configuración (**memory**/**postgres** para persistencia,
+    **redundancy**/**undersampling** para filtros), evitando condicionales explícitos en el código y permitiendo cambiar el comportamiento 
+    de la aplicación solo editando **application.properties**.
+
+- **Separación entre modelo de dominio y entidades de persistencia**: **Blueprint**/**Point** (records inmutables) se mantienen independientes 
+    de **BlueprintEntity**/**PointEntity** (entidades JPA mutables), evitando que los detalles de la base de datos contaminen la lógica de negocio.
+
+- **Manejo explícito de excepciones de negocio**: **BlueprintNotFoundExcepton** y **BlueprintPersistenceException** comunican errores específicos 
+    del dominio, traducidos en el controlador a códigos HTTP (404, 409).
+
+- **Respuesta uniforme de la API**: el record genérico **ApiResponse** iguala la forma de todas las respuestas (code, message, data),
+
+- **Validación declarativa** con @Valid y @NotBlank en los DTOs de entrada, delegando en Spring la verificación de datos inválidos 
+    (400 Bad Request) en lugar de validarlos manualmente en el controlador.
+
+- **Documentación automática con OpenAPI/Swagger**, usando @Operation y @ApiResponse para describir cada endpoint y sus posibles
+    respuestas directamente desde el código.
+
+- **Transacciones explícitas (@Transactional)** en las operaciones de persistencia que modifican datos, y modo de solo lectura 
+    (readOnly = true) en las consultas, optimizando el acceso a la base de datos.
+
+### **Bonus**
+
+#### * Imagen de contenedor (spring-boot:build-image).
+
+1) Construimos la imagen
+docker build -t blueprints-api .
+2) Miramos si la imagen efectivamente se creo
+docker images
+![imagenDocker.png](Imagenes/imagenDocker.png)
+
+3) Vemos el nombre de la red
+
+>docker network ls
+
+![NombreDocker.png](Imagenes/NombreDocker.png)
+
+4) Corremos la imagen
+
+>docker run -p 8080:8080 --network blueprints_default -e SPRING_DATASOURCE_URL=jdbc:postgresql://blueprints-postgres:5432/blueprints_db blueprints-api
+
+![pruebaDocker.png](Imagenes/pruebaDocker.png)
+
+* #### **Métricas con Actuator.**
+
+Agregamos la dependencia al pom.xml
+
+> <dependency>
+>     <groupId>org.springframework.boot</groupId>
+>     <artifactId>spring-boot-starter-actuator</artifactId>
+> </dependency>
+
