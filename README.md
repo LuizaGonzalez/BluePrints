@@ -293,11 +293,11 @@ Utilizamos la url en nuestro navegador y con el comando curl
 HEALTH
 Navegador : http://localhost:8080/actuator/health
 
-![img.png](img.png)
+![img.png](Imagenes/img8.png)
 
 CMD : curl http://localhost:8080/actuator/health
 
-![img_1.png](img_1.png)
+![img_1.png](Imagenes/bonus1.png)
 
 El endpoint /actuator/health indica si la aplicación y sus componentes 
 críticos están funcionando correctamente, mostrando un estado general
@@ -310,12 +310,12 @@ si la base de datos se desconecta.
 METRICS
 
 Navegador : http://localhost:8080/actuator/metrics
-![img_2.png](img_2.png)
-![img_4.png](img_4.png)
+![img_2.png](Imagenes/bonus2.png)
+![img_4.png](Imagenes/bonus4.png)
 
 CMD : curl http://localhost:8080/actuator/metrics
 
-![img_3.png](img_3.png)
+![img_3.png](Imagenes/bonus3.png)
 
 El endpoint /actuator/metrics, por su parte, no muestra valores
 directamente sino un catálogo con los nombres de todas las métricas 
